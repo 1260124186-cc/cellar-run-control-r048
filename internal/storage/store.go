@@ -69,6 +69,9 @@ func normalizeSnapshot(value domain.Snapshot) (domain.Snapshot, error) {
 	if value.Runs == nil {
 		value.Runs = map[string]domain.FermentationRun{}
 	}
+	if value.Reports == nil {
+		value.Reports = map[string]domain.CompletionReport{}
+	}
 	if value.NameIndex == nil {
 		value.NameIndex = map[string]string{}
 	}
@@ -77,6 +80,9 @@ func normalizeSnapshot(value domain.Snapshot) (domain.Snapshot, error) {
 	}
 	if value.RunIndex == nil {
 		value.RunIndex = map[string]string{}
+	}
+	if value.ReportRunIndex == nil {
+		value.ReportRunIndex = map[string]string{}
 	}
 	if err := validateIndexes(value); err != nil {
 		return domain.Snapshot{}, err
@@ -118,7 +124,27 @@ func validateIndexes(value domain.Snapshot) error {
 		}
 		expectedRuns[run.Code] = id
 	}
-	return compareIndexes("run code", value.RunIndex, expectedRuns)
+	if err := compareIndexes("run code", value.RunIndex, expectedRuns); err != nil {
+		return err
+	}
+
+	expectedReports := make(map[string]string, len(value.Reports))
+	for number, report := range value.Reports {
+		if report.Number != number {
+			return fmt.Errorf("report %s is stored under a mismatched number", report.Number)
+		}
+		if existing, found := expectedReports[report.RunID]; found && existing != number {
+			return fmt.Errorf("report run index contains a duplicate run")
+		}
+		expectedReports[report.RunID] = number
+	}
+	if err := compareIndexes("report run", value.ReportRunIndex, expectedReports); err != nil {
+		return err
+	}
+	if value.ReportSeq < int64(len(value.Reports)) {
+		return fmt.Errorf("report sequence does not match its collection")
+	}
+	return nil
 }
 
 func compareIndexes(label string, actual, expected map[string]string) error {

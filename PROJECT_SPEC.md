@@ -97,6 +97,26 @@ time, gravity, temperature, optional note, and receipt time.
 - Gravity must not rise more than 0.010 above the immediately preceding value.
 - Observation sequences are contiguous and start at 1.
 
+### CompletionReport
+
+A completion report is the immutable release archive for a terminal run. It
+contains a sequential report number, the run identifier and code, the
+completed or aborted conclusion, a frozen copy of the formula as approved
+(including its version), a frozen vessel snapshot, the planned volume, the
+run timetable, the full observation curve, the final metrics, and the
+generation timestamp.
+
+- Only a completed or aborted run can be archived.
+- A report freezes its source data; later formula or vessel changes never
+  rewrite an archived report.
+- Generation is idempotent per run: every request for the same run returns
+  the same report number and body, including under concurrency.
+- Report numbers are sequential, never reused, and persisted with the report.
+- The report body, the run-to-report index entry, and the number sequence
+  commit in one snapshot write; a failed write leaves no index without a
+  body.
+- The run detail exposes `report_number` once a report exists.
+
 ## Connected Workflows
 
 ### 1. Formula Approval
@@ -150,6 +170,25 @@ transitions return stable failures without changing persisted state.
 This path crosses HTTP protocol handling, application orchestration, numeric
 domain rules, and snapshot storage.
 
+### 4. Release Archive
+
+Public entry points are:
+
+- `POST /v1/runs/{id}/report`
+- `GET /v1/runs/{id}`
+- `GET /v1/reports`
+- `GET /v1/reports/{number}`
+
+The client archives a completed or aborted run into an immutable completion
+report, locates the report number from the run detail, lists report summaries,
+and downloads a single report body. Archiving an open run returns a stable
+state error. Concurrent generation for the same run converges on one report,
+and a restart keeps summaries, bodies, and the run-to-report index in
+agreement.
+
+This path crosses HTTP protocol handling, application orchestration, domain
+rules, snapshot storage, and durable recovery.
+
 ## Modules
 
 - `cmd/fermentctl`: executable entry point for the HTTP service and bounded
@@ -196,7 +235,9 @@ rejects a stale write instead of overwriting newer state.
 The configured data directory contains `state.json`. Writes are serialized by
 an in-process mutex. The complete state is encoded, committed to durable
 storage, and then atomically renamed over the target. An update is not
-published in memory unless persistence succeeds.
+published in memory unless persistence succeeds. Report bodies, the
+run-to-report index, and the report number sequence are part of the same
+snapshot, so they commit or fail together.
 
 Reads use copied values and never expose repository-owned maps or slices. The
 default address is `127.0.0.1:8088`, the request body limit is 1 MiB, and all
@@ -210,13 +251,14 @@ task owns systematic tests for validation boundaries, state transitions,
 numeric calculations, stale revisions, storage failures, and concurrent
 reservation attempts.
 
-The current build command is `go build ./...`. Three bounded production checks
+The current build command is `go build ./...`. Four bounded production checks
 start the real HTTP handler, issue real JSON requests, check success and failure
 behavior, and exit without external services:
 
 - `go run ./cmd/fermentctl check formula-approval`
 - `go run ./cmd/fermentctl check vessel-run-lifecycle`
 - `go run ./cmd/fermentctl check observations-completion`
+- `go run ./cmd/fermentctl check report-archive`
 
 ## Scope Limits
 

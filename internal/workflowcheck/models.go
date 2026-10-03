@@ -28,6 +28,7 @@ type runView struct {
 	VesselID     *string                     `json:"vessel_id"`
 	Observations []domain.GravityObservation `json:"observations"`
 	Metrics      *domain.RunMetrics          `json:"metrics"`
+	ReportNumber string                      `json:"report_number"`
 }
 
 type pairView struct {

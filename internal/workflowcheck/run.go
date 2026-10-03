@@ -18,14 +18,27 @@ func Run(name string) error {
 	}
 	defer os.RemoveAll(dataDir)
 
-	store, err := storage.Open(dataDir)
+	var server *httptest.Server
+	open := func() (*client, error) {
+		store, err := storage.Open(dataDir)
+		if err != nil {
+			return nil, err
+		}
+		app := service.New(store, clock.System{})
+		server = httptest.NewServer(httpapi.NewHandler(app))
+		return newClient(server.URL), nil
+	}
+	api, err := open()
 	if err != nil {
 		return err
 	}
-	app := service.New(store, clock.System{})
-	server := httptest.NewServer(httpapi.NewHandler(app))
-	defer server.Close()
-	api := newClient(server.URL)
+	defer func() { server.Close() }()
+
+	// restart simulates a service restart against the same data directory.
+	restart := func() (*client, error) {
+		server.Close()
+		return open()
+	}
 
 	switch name {
 	case "formula-approval":
@@ -38,6 +51,10 @@ func Run(name string) error {
 		}
 	case "observations-completion":
 		if err := observationsCompletion(api); err != nil {
+			return err
+		}
+	case "report-archive":
+		if err := reportArchive(api, restart); err != nil {
 			return err
 		}
 	default:

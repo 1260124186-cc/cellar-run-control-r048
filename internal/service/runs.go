@@ -181,20 +181,21 @@ func (s *Service) AbortRun(
 	return updatedRun, updatedVessel, nil
 }
 
-func (s *Service) GetRun(id string) (domain.FermentationRun, error) {
-	var found domain.FermentationRun
+func (s *Service) GetRun(id string) (RunDetail, error) {
+	var detail RunDetail
 	err := s.store.View(func(snapshot domain.Snapshot) error {
 		run, ok := snapshot.Runs[id]
 		if !ok {
 			return domain.NewError(domain.CodeRunNotFound, "run was not found")
 		}
-		found = run.Clone()
+		detail.Run = run.Clone()
+		detail.ReportNumber = snapshot.ReportRunIndex[id]
 		return nil
 	})
 	if err != nil {
-		return domain.FermentationRun{}, err
+		return RunDetail{}, err
 	}
-	return found, nil
+	return detail, nil
 }
 
 func (s *Service) ListRuns() ([]domain.FermentationRun, error) {

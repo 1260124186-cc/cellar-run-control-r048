@@ -60,6 +60,10 @@ func NormalizeRunCode(value string) string {
 	return strings.ToUpper(strings.TrimSpace(value))
 }
 
+func NormalizeReportNumber(value string) string {
+	return strings.ToUpper(strings.TrimSpace(value))
+}
+
 func ValidateRunCode(value, field string) error {
 	if !runCodePattern.MatchString(value) {
 		return FieldError(CodeInvalidInput, field,

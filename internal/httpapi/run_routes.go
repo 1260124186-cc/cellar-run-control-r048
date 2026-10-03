@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/1260124186-cc/solo-0016-cellar-run-control/internal/domain"
 	"github.com/1260124186-cc/solo-0016-cellar-run-control/internal/service"
 )
 
@@ -24,6 +25,13 @@ type observationRequest struct {
 	TemperatureC float64   `json:"temperature_c"`
 	ObservedAt   time.Time `json:"observed_at"`
 	Note         string    `json:"note"`
+}
+
+// runDetailResponse flattens the run aggregate and adds the archive link so a
+// client can locate the completion report from the run detail alone.
+type runDetailResponse struct {
+	domain.FermentationRun
+	ReportNumber string `json:"report_number,omitempty"`
 }
 
 func registerRunRoutes(mux *http.ServeMux, app *service.Service) {
@@ -55,12 +63,15 @@ func registerRunRoutes(mux *http.ServeMux, app *service.Service) {
 	})
 
 	mux.HandleFunc("GET /v1/runs/{id}", func(response http.ResponseWriter, request *http.Request) {
-		run, err := app.GetRun(request.PathValue("id"))
+		detail, err := app.GetRun(request.PathValue("id"))
 		if err != nil {
 			writeDomainError(response, err)
 			return
 		}
-		writeJSON(response, http.StatusOK, run)
+		writeJSON(response, http.StatusOK, runDetailResponse{
+			FermentationRun: detail.Run,
+			ReportNumber:    detail.ReportNumber,
+		})
 	})
 
 	mux.HandleFunc("POST /v1/runs/{id}/reserve", func(response http.ResponseWriter, request *http.Request) {

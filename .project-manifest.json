@@ -113,6 +113,26 @@
         "domain",
         "storage"
       ]
+    },
+    {
+      "id": "report-archive",
+      "name": "Archive a terminal run into an immutable completion report",
+      "entry": "POST /v1/runs/{id}/report",
+      "steps": [
+        "generate the completion report for a completed or aborted run",
+        "converge concurrent generation on one report number and body",
+        "locate the report from the run detail and list summaries",
+        "download the report body and verify it survives a restart"
+      ],
+      "success": "returns the same frozen archive for every later request",
+      "failure": "returns a stable state error for open runs and a not-found error for unknown numbers",
+      "verification": "the check issues real HTTP requests, races two generations, and restarts the service against the same data directory",
+      "module_ids": [
+        "httpapi",
+        "service",
+        "domain",
+        "storage"
+      ]
     }
   ]
 }

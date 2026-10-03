@@ -94,6 +94,21 @@ Run workflow:
 - `POST /v1/runs/{id}/complete`
 - `POST /v1/runs/{id}/abort`
 
+Release archive:
+
+- `POST /v1/runs/{id}/report`
+- `GET /v1/reports`
+- `GET /v1/reports/{number}`
+
+Generating a report freezes the run's terminal state into an immutable
+completion archive: the formula version in effect, the vessel, the full
+observation curve, the final metrics, and the completed or aborted
+conclusion. Generation is idempotent per run — the first request returns
+`201`, later requests return `200` with the same archive — so concurrent
+requests can never produce two contradictory reports. The run detail carries
+`report_number` once archived, and `GET /v1/reports/{number}` downloads the
+archive body as a JSON attachment.
+
 Writes accept an optional `X-Expected-Version` header. Errors use a stable
 shape:
 
@@ -115,6 +130,7 @@ Run each production workflow check separately:
 go run ./cmd/fermentctl check formula-approval
 go run ./cmd/fermentctl check vessel-run-lifecycle
 go run ./cmd/fermentctl check observations-completion
+go run ./cmd/fermentctl check report-archive
 ```
 
 Each check creates a temporary snapshot directory, starts the real HTTP
@@ -127,11 +143,14 @@ The service stores a complete revisioned snapshot at
 `<data-directory>/state.json`. A write creates a temporary file in the same
 directory, commits the encoded bytes durably, closes the handle, and renames
 the result over the previous snapshot. The in-memory snapshot is replaced only
-after that operation succeeds.
+after that operation succeeds. Report bodies, the run-to-report index, and the
+report number sequence live in the same snapshot, so a failed write can never
+leave an index entry without its body.
 
 On startup, an existing snapshot is decoded and normalized. Unknown or
-conflicting map indexes are not silently invented; invalid JSON or a negative
-revision stops the process before HTTP serving begins.
+conflicting map indexes are not silently invented; invalid JSON, a negative
+revision, or a report index that disagrees with the archived bodies stops the
+process before HTTP serving begins.
 
 ## Repair-Ready Boundaries
 

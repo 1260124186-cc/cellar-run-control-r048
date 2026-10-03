@@ -53,3 +53,10 @@ type ObservationInput struct {
 type FinishCleaningInput struct {
 	ExpectedVersion *int64
 }
+
+// RunDetail pairs a run with the report number of its completion archive,
+// which is empty until a report has been generated for the run.
+type RunDetail struct {
+	Run          domain.FermentationRun
+	ReportNumber string
+}

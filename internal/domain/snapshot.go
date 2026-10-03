@@ -3,25 +3,30 @@ package domain
 import "time"
 
 type Snapshot struct {
-	Revision    int64                      `json:"revision"`
-	UpdatedAt   time.Time                  `json:"updated_at"`
-	Formulas    map[string]Formula         `json:"formulas"`
-	Vessels     map[string]Vessel          `json:"vessels"`
-	Runs        map[string]FermentationRun `json:"runs"`
-	NameIndex   map[string]string          `json:"formula_name_index"`
-	VesselIndex map[string]string          `json:"vessel_code_index"`
-	RunIndex    map[string]string          `json:"run_code_index"`
+	Revision       int64                       `json:"revision"`
+	UpdatedAt      time.Time                   `json:"updated_at"`
+	Formulas       map[string]Formula          `json:"formulas"`
+	Vessels        map[string]Vessel           `json:"vessels"`
+	Runs           map[string]FermentationRun  `json:"runs"`
+	Reports        map[string]CompletionReport `json:"reports"`
+	NameIndex      map[string]string           `json:"formula_name_index"`
+	VesselIndex    map[string]string           `json:"vessel_code_index"`
+	RunIndex       map[string]string           `json:"run_code_index"`
+	ReportRunIndex map[string]string           `json:"report_run_index"`
+	ReportSeq      int64                       `json:"report_seq"`
 }
 
 func EmptySnapshot() Snapshot {
 	return Snapshot{
-		Revision:    0,
-		Formulas:    map[string]Formula{},
-		Vessels:     map[string]Vessel{},
-		Runs:        map[string]FermentationRun{},
-		NameIndex:   map[string]string{},
-		VesselIndex: map[string]string{},
-		RunIndex:    map[string]string{},
+		Revision:       0,
+		Formulas:       map[string]Formula{},
+		Vessels:        map[string]Vessel{},
+		Runs:           map[string]FermentationRun{},
+		Reports:        map[string]CompletionReport{},
+		NameIndex:      map[string]string{},
+		VesselIndex:    map[string]string{},
+		RunIndex:       map[string]string{},
+		ReportRunIndex: map[string]string{},
 	}
 }
 
@@ -43,6 +48,9 @@ func (s Snapshot) Clone() Snapshot {
 	for key, value := range s.Runs {
 		cloned.Runs[key] = value.Clone()
 	}
+	for key, value := range s.Reports {
+		cloned.Reports[key] = value.Clone()
+	}
 	for key, value := range s.NameIndex {
 		cloned.NameIndex[key] = value
 	}
@@ -52,6 +60,10 @@ func (s Snapshot) Clone() Snapshot {
 	for key, value := range s.RunIndex {
 		cloned.RunIndex[key] = value
 	}
+	for key, value := range s.ReportRunIndex {
+		cloned.ReportRunIndex[key] = value
+	}
+	cloned.ReportSeq = s.ReportSeq
 	return cloned
 }
 
