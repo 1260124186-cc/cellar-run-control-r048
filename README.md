@@ -94,6 +94,16 @@ Run workflow:
 - `POST /v1/runs/{id}/complete`
 - `POST /v1/runs/{id}/abort`
 
+Completion reports:
+
+- `POST /v1/runs/{id}/reports`
+- `GET /v1/reports`
+- `GET /v1/reports/{id}`
+- `GET /v1/reports/{id}/download`
+
+`GET /v1/runs/{id}` embeds the summary of the run's archived report, when one
+exists, so the run detail view locates its dossier.
+
 Writes accept an optional `X-Expected-Version` header. Errors use a stable
 shape:
 
@@ -115,6 +125,7 @@ Run each production workflow check separately:
 go run ./cmd/fermentctl check formula-approval
 go run ./cmd/fermentctl check vessel-run-lifecycle
 go run ./cmd/fermentctl check observations-completion
+go run ./cmd/fermentctl check completion-reports
 ```
 
 Each check creates a temporary snapshot directory, starts the real HTTP
@@ -132,6 +143,30 @@ after that operation succeeds.
 On startup, an existing snapshot is decoded and normalized. Unknown or
 conflicting map indexes are not silently invented; invalid JSON or a negative
 revision stops the process before HTTP serving begins.
+
+## Completion Reports
+
+A report freezes the completion dossier of a batch at release time: the exact
+formula version (including its process steps), the vessel and planned volume,
+the full ordered observation curve, the final metrics, and a `completed` or
+`aborted` conclusion. All of these are copied into the report, so later
+formula changes never alter an existing dossier.
+
+- A report can only be generated once a run is `completed` or `aborted`.
+- Generation is idempotent per run: repeat (or concurrent) generation returns
+  the same report ID and content; two operators can never get contradictory
+  dossiers. The first request returns `201`, repeats return `200`.
+- Reports are stored long-term by report ID. Each body is a durable JSON file
+  under `<data-directory>/reports/`, and a summary carrying a SHA-256 content
+  hash lives in the revisioned snapshot.
+- The body file is committed before the summary is published. If publishing
+  the snapshot fails, no summary points at a missing body. On restart,
+  bodies and summaries are reconciled: orphaned bodies are reclaimed, and a
+  missing body or hash mismatch stops startup rather than serving
+  inconsistent data.
+- `GET /v1/reports/{id}` returns the verified body and its hash.
+- `GET /v1/reports/{id}/download` serves the exact archived bytes as a JSON
+  attachment, with the content hash in `X-Content-SHA256`.
 
 ## Repair-Ready Boundaries
 

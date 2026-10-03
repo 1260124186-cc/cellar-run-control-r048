@@ -72,6 +72,25 @@ func (r response) decode(target any) error {
 	return nil
 }
 
+// getRaw issues a GET request and returns the untouched response body along
+// with its headers and status, used to verify file downloads.
+func (c *client) getRaw(path string) ([]byte, http.Header, int, error) {
+	request, err := http.NewRequest(http.MethodGet, c.baseURL+path, nil)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("create request: %w", err)
+	}
+	raw, err := c.http.Do(request)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("perform request: %w", err)
+	}
+	defer raw.Body.Close()
+	content, err := io.ReadAll(io.LimitReader(raw.Body, 2<<20))
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("read response: %w", err)
+	}
+	return content, raw.Header, raw.StatusCode, nil
+}
+
 func (r response) errorCode() string {
 	var body struct {
 		Error struct {

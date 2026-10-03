@@ -97,6 +97,27 @@ time, gravity, temperature, optional note, and receipt time.
 - Gravity must not rise more than 0.010 above the immediately preceding value.
 - Observation sequences are contiguous and start at 1.
 
+### CompletionReport
+
+A completion report is the immutable dossier carried away when a concluded
+batch is released. It contains a report identifier, its run identifier and
+code, generation time, conclusion (`completed` or `aborted`), the snapshot
+revision at generation, the run state and version, planned volume and notes,
+start and end timestamps, an archived formula snapshot (including its exact
+version and ordered process steps), an optional vessel archive (identifier,
+code, capacity, and planned volume), the full ordered observation curve, and
+the final metrics.
+
+- Reports can be generated only for a `completed` or `aborted` run.
+- The formula, vessel, observations, and metrics are copied into the report at
+  generation; later formula lifecycle changes cannot alter a dossier.
+- A run has at most one report. Generation is idempotent: repeat or concurrent
+  generation returns the single archived report rather than creating another.
+- A `ReportSummary` (report ID, run ID and code, conclusion, run state,
+  generation time, snapshot revision, and body SHA-256) is indexed in the
+  snapshot. It must always match the archived body.
+- Reports are immutable and retained indefinitely by report ID.
+
 ## Connected Workflows
 
 ### 1. Formula Approval
@@ -150,6 +171,29 @@ transitions return stable failures without changing persisted state.
 This path crosses HTTP protocol handling, application orchestration, numeric
 domain rules, and snapshot storage.
 
+### 4. Completion Report Release
+
+Public entry points are:
+
+- `POST /v1/runs/{id}/reports`
+- `GET /v1/reports`
+- `GET /v1/reports/{id}`
+- `GET /v1/reports/{id}/download`
+- `GET /v1/runs/{id}`
+
+After a run is completed or aborted, the client requests its completion
+report. The service freezes the formula version, vessel, observation curve,
+final metrics, and conclusion into one dossier stored by report ID. The
+client lists report summaries, reads the verified body by report ID,
+downloads the exact archived bytes as a standalone file, and locates the
+report from the run detail view. Generating for an open run, for a missing
+run, or twice for the same run returns stable behavior: the first
+generation returns `201`, while repeat or concurrent generations return the
+same report with `200`.
+
+This path crosses HTTP protocol handling, application orchestration, the
+report archive builder, and coordinated file-plus-snapshot persistence.
+
 ## Modules
 
 - `cmd/fermentctl`: executable entry point for the HTTP service and bounded
@@ -189,6 +233,13 @@ updated aggregate and its version. A failed write returns:
 Write requests may include `X-Expected-Version`. When present, the service
 rejects a stale write instead of overwriting newer state.
 
+Report generation accepts an empty JSON object or no body. The first
+generation for a run returns `201`; repeat or concurrent generation returns
+the same archived report with `200`. `GET /v1/runs/{id}` embeds the report
+summary under `report` when one exists. `GET /v1/reports/{id}` returns the
+verified body plus `content_hash`; the download route serves the exact
+archived bytes as an attachment with the hash in `X-Content-SHA256`.
+
 `GET /healthz` returns process health and the current snapshot revision.
 
 ## Persistence And Concurrency
@@ -197,6 +248,16 @@ The configured data directory contains `state.json`. Writes are serialized by
 an in-process mutex. The complete state is encoded, committed to durable
 storage, and then atomically renamed over the target. An update is not
 published in memory unless persistence succeeds.
+
+Completion reports each have a durable JSON body in the `reports/`
+subdirectory plus a summary (with a SHA-256 content hash) in the snapshot
+report index. Report generation is serialized under the same mutex and writes
+the body before publishing the summary: a failed snapshot write cannot leave
+an index entry pointing at no body, and no body is ever served unless it is
+indexed and verified. On startup the index and bodies are reconciled:
+unindexed bodies are removed, while missing bodies, hash mismatches, or
+dangling run references stop the process before HTTP serving begins. Repeat
+or concurrent generation for one run resolves to the single archived report.
 
 Reads use copied values and never expose repository-owned maps or slices. The
 default address is `127.0.0.1:8088`, the request body limit is 1 MiB, and all
@@ -217,6 +278,7 @@ behavior, and exit without external services:
 - `go run ./cmd/fermentctl check formula-approval`
 - `go run ./cmd/fermentctl check vessel-run-lifecycle`
 - `go run ./cmd/fermentctl check observations-completion`
+- `go run ./cmd/fermentctl check completion-reports`
 
 ## Scope Limits
 

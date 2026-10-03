@@ -60,7 +60,17 @@ func registerRunRoutes(mux *http.ServeMux, app *service.Service) {
 			writeDomainError(response, err)
 			return
 		}
-		writeJSON(response, http.StatusOK, run)
+		summary, found, err := app.ReportSummaryForRun(run.ID)
+		if err != nil {
+			writeDomainError(response, err)
+			return
+		}
+		detail := runDetailResponse{FermentationRun: run}
+		if found {
+			summaryCopy := summary
+			detail.Report = &summaryCopy
+		}
+		writeJSON(response, http.StatusOK, detail)
 	})
 
 	mux.HandleFunc("POST /v1/runs/{id}/reserve", func(response http.ResponseWriter, request *http.Request) {

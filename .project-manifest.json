@@ -113,6 +113,27 @@
         "domain",
         "storage"
       ]
+    },
+    {
+      "id": "completion-reports",
+      "name": "Generate, read, download, and recover an immutable completion dossier",
+      "entry": "POST /v1/runs/{id}/reports",
+      "steps": [
+        "freeze the formula version, vessel, observation curve, metrics, and conclusion for a concluded run",
+        "return the single same dossier on repeat and concurrent generation",
+        "locate the report from run detail, list summaries, and read by report ID",
+        "download the exact archived bytes and verify the content hash",
+        "reconcile summaries and bodies across restart and failed writes"
+      ],
+      "success": "returns one immutable, hash-verified report per run that survives restart and formula changes",
+      "failure": "returns a stable state or not-found error and never leaves an index without a matching body",
+      "verification": "the check issues real HTTP requests, races concurrent generations, injects a disk write failure, and reopens the store",
+      "module_ids": [
+        "httpapi",
+        "service",
+        "domain",
+        "storage"
+      ]
     }
   ]
 }

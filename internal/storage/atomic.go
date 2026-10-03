@@ -40,3 +40,38 @@ func writeSnapshot(path string, snapshot any) error {
 	removeTemp = false
 	return nil
 }
+
+// writeFileAtomic durably writes payload to path: bytes are written to a
+// temporary file in the same directory, synced, closed, and atomically
+// renamed into place. A failure never leaves a partially written target.
+func writeFileAtomic(path, tempPrefix string, payload []byte) error {
+	directory := filepath.Dir(path)
+	handle, err := os.CreateTemp(directory, tempPrefix)
+	if err != nil {
+		return fmt.Errorf("create temporary file: %w", err)
+	}
+	tempName := handle.Name()
+	removeTemp := true
+	defer func() {
+		if removeTemp {
+			_ = os.Remove(tempName)
+		}
+	}()
+
+	if _, err := handle.Write(payload); err != nil {
+		_ = handle.Close()
+		return fmt.Errorf("write file bytes: %w", err)
+	}
+	if err := handle.Sync(); err != nil {
+		_ = handle.Close()
+		return fmt.Errorf("commit file bytes: %w", err)
+	}
+	if err := handle.Close(); err != nil {
+		return fmt.Errorf("close temporary file: %w", err)
+	}
+	if err := os.Rename(tempName, path); err != nil {
+		return fmt.Errorf("replace file: %w", err)
+	}
+	removeTemp = false
+	return nil
+}

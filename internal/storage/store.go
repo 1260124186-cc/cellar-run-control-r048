@@ -33,6 +33,9 @@ func Open(dataDir string) (*Store, error) {
 	if err := store.load(); err != nil {
 		return nil, err
 	}
+	if err := store.reconcileReports(); err != nil {
+		return nil, err
+	}
 	return store, nil
 }
 
@@ -77,6 +80,9 @@ func normalizeSnapshot(value domain.Snapshot) (domain.Snapshot, error) {
 	}
 	if value.RunIndex == nil {
 		value.RunIndex = map[string]string{}
+	}
+	if value.ReportIndex == nil {
+		value.ReportIndex = map[string]domain.ReportSummary{}
 	}
 	if err := validateIndexes(value); err != nil {
 		return domain.Snapshot{}, err

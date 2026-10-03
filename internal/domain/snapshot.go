@@ -11,6 +11,9 @@ type Snapshot struct {
 	NameIndex   map[string]string          `json:"formula_name_index"`
 	VesselIndex map[string]string          `json:"vessel_code_index"`
 	RunIndex    map[string]string          `json:"run_code_index"`
+	// ReportIndex maps report ID to the summary of an archived report body.
+	// It is updated only together with the durable body file.
+	ReportIndex map[string]ReportSummary `json:"report_index"`
 }
 
 func EmptySnapshot() Snapshot {
@@ -22,6 +25,7 @@ func EmptySnapshot() Snapshot {
 		NameIndex:   map[string]string{},
 		VesselIndex: map[string]string{},
 		RunIndex:    map[string]string{},
+		ReportIndex: map[string]ReportSummary{},
 	}
 }
 
@@ -51,6 +55,9 @@ func (s Snapshot) Clone() Snapshot {
 	}
 	for key, value := range s.RunIndex {
 		cloned.RunIndex[key] = value
+	}
+	for key, value := range s.ReportIndex {
+		cloned.ReportIndex[key] = value
 	}
 	return cloned
 }
